@@ -191,6 +191,16 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
   ): PromiseLike<TResult1 | TResult2> {
     return this.spawn().then(onfulfilled).catch(onrejected);
   }
+  
+  catch<TResult1 = CommandResult, TResult2 = never>(
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null | undefined,
+  ): PromiseLike<TResult1 | TResult2> {
+    return this.then().catch(onrejected);
+  }
+  
+  finally(onfinally?: (() => void) | null): Promise<CommandResult> {
+      return this.then().finally(onfinally);
+  }
 
   /**
    * Explicit way to spawn a command.
