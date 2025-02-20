@@ -2,7 +2,7 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import { Buffer } from "@std/io/buffer";
 import { toWritableStream } from "@std/io/to-writable-stream";
 import * as path from "@std/path";
-import { isNode } from "which_runtime";
+import { isNode } from "jsr:@david/which-runtime@0.2";
 import $ from "../mod.ts";
 import { TimeoutError } from "./common.ts";
 import { RequestBuilder } from "./request.ts";

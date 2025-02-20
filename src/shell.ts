@@ -1,6 +1,6 @@
 import { existsSync } from "@std/fs/exists";
 import * as path from "@std/path";
-import { RealEnvironment as DenoWhichRealEnvironment, which } from "which";
+import { RealEnvironment as DenoWhichRealEnvironment, which } from "jsr:@david/which@~0.4.1";
 import type { KillSignal } from "./command.ts";
 import type { CommandContext, CommandHandler, CommandPipeReader } from "./command_handler.ts";
 import { errorToString, getExecutableShebangFromPath, type ShebangInfo } from "./common.ts";

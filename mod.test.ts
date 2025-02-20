@@ -5,7 +5,7 @@ import { readAll } from "@std/io/read-all";
 import { toWritableStream } from "@std/io/to-writable-stream";
 import * as path from "@std/path";
 import { readerFromStreamReader } from "@std/streams/reader-from-stream-reader";
-import { isNode } from "which_runtime";
+import { isNode } from "jsr:@david/which-runtime@0.2";
 import $, {
   build$,
   CommandBuilder,

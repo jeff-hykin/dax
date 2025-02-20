@@ -1,5 +1,5 @@
 import * as colors from "@std/fmt/colors";
-import { which, whichSync } from "which";
+import { which, whichSync } from "jsr:@david/which@~0.4.1";
 import {
   CommandBuilder,
   escapeArg,
