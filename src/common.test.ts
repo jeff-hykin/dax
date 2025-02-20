@@ -1,6 +1,6 @@
-import { assertEquals } from "@std/assert";
-import { Buffer } from "@std/io/buffer";
-import * as path from "@std/path";
+import { assertEquals } from "jsr:@std/assert@1";
+import { Buffer } from "jsr:@std/io@0.221/buffer";
+import * as path from "jsr:@std/path@1";
 import {
   delayToIterator,
   delayToMs,

@@ -1,4 +1,4 @@
-import { Path } from "@david/path";
+import { Path } from "jsr:@david/path@0.2";
 
 /**
  * Creates a temporary directory, changes the cwd to this directory,

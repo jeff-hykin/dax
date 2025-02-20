@@ -1,5 +1,5 @@
-import { existsSync } from "@std/fs/exists";
-import * as path from "@std/path";
+import { existsSync } from "jsr:@std/fs@1/exists";
+import * as path from "jsr:@std/path@1";
 import { RealEnvironment as DenoWhichRealEnvironment, which } from "jsr:@david/which@~0.4.1";
 import type { KillSignal } from "./command.ts";
 import type { CommandContext, CommandHandler, CommandPipeReader } from "./command_handler.ts";

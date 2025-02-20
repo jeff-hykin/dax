@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "jsr:@std/assert@1";
 import { innerConfirm } from "./confirm.ts";
 import { createTester } from "./testUtils.ts";
 import { Keys } from "./utils.ts";

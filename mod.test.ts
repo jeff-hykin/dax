@@ -1,10 +1,10 @@
-import { assert, assertEquals, assertMatch, assertRejects, assertStringIncludes, assertThrows } from "@std/assert";
-import * as colors from "@std/fmt/colors";
-import { Buffer } from "@std/io/buffer";
-import { readAll } from "@std/io/read-all";
-import { toWritableStream } from "@std/io/to-writable-stream";
-import * as path from "@std/path";
-import { readerFromStreamReader } from "@std/streams/reader-from-stream-reader";
+import { assert, assertEquals, assertMatch, assertRejects, assertStringIncludes, assertThrows } from "jsr:@std/assert@1";
+import * as colors from "jsr:@std/fmt@1/colors";
+import { Buffer } from "jsr:@std/io@0.221/buffer";
+import { readAll } from "jsr:@std/io@0.221/read-all";
+import { toWritableStream } from "jsr:@std/io@0.221/to-writable-stream";
+import * as path from "jsr:@std/path@1";
+import { readerFromStreamReader } from "jsr:@std/streams@0.221/reader-from-stream-reader";
 import { isNode } from "jsr:@david/which-runtime@0.2";
 import $, {
   build$,

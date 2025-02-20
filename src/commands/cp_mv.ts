@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "jsr:@std/path@1";
 import type { CommandContext } from "../command_handler.ts";
 import { errorToString, resolvePath, safeLstat } from "../common.ts";
 import type { ExecuteResult } from "../result.ts";

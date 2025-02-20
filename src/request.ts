@@ -1,4 +1,4 @@
-import { Path } from "@david/path";
+import { Path } from "jsr:@david/path@0.2";
 import { formatMillis, symbols } from "./common.ts";
 import { TimeoutError } from "./common.ts";
 import { type Delay, delayToMs, filterEmptyRecordValues, getFileNameFromUrl } from "./common.ts";

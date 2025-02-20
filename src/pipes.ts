@@ -1,11 +1,11 @@
-import type { FsFileWrapper, Path } from "@david/path";
-import { Buffer } from "@std/io/buffer";
-import { writeAll, writeAllSync } from "@std/io/write-all";
+import type { FsFileWrapper, Path } from "jsr:@david/path@0.2";
+import { Buffer } from "jsr:@std/io@0.221/buffer";
+import { writeAll, writeAllSync } from "jsr:@std/io@0.221/write-all";
 import type { CommandBuilder, KillSignal } from "./command.ts";
 import { abortSignalToPromise } from "./common.ts";
 import { logger } from "./console/logger.ts";
 import type { RequestBuilder } from "./request.ts";
-import type { Closer, Reader, ReaderSync, Writer, WriterSync } from "@std/io/types";
+import type { Closer, Reader, ReaderSync, Writer, WriterSync } from "jsr:@std/io@0.221/types";
 export type { Closer, Reader, ReaderSync, Writer, WriterSync };
 
 const encoder = new TextEncoder();

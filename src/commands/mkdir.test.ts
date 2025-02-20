@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "jsr:@std/assert@1";
 import { parseArgs } from "./mkdir.ts";
 
 Deno.test("test mkdir parse args", () => {

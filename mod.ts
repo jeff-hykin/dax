@@ -1,4 +1,4 @@
-import * as colors from "@std/fmt/colors";
+import * as colors from "jsr:@std/fmt@1/colors";
 import { which, whichSync } from "jsr:@david/which@~0.4.1";
 import {
   CommandBuilder,
@@ -38,12 +38,12 @@ import {
 } from "./src/console/mod.ts";
 import { wasmInstance } from "./src/lib/mod.ts";
 
-import { Path } from "@david/path";
+import { Path } from "jsr:@david/path@0.2";
 import { RequestBuilder, withProgressBarFactorySymbol } from "./src/request.ts";
 import { outdent } from "./src/vendor/outdent.ts";
 import { denoWhichRealEnv } from "./src/shell.ts";
 
-export { type DirEntry, FsFileWrapper, Path, type SymlinkOptions } from "@david/path";
+export { type DirEntry, FsFileWrapper, Path, type SymlinkOptions } from "jsr:@david/path@0.2";
 export type { Delay, DelayIterator } from "./src/common.ts";
 export { TimeoutError } from "./src/common.ts";
 /** @deprecated Import `Path` instead. */

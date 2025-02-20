@@ -1,4 +1,4 @@
-import { exists } from "@std/fs/exists";
+import { exists } from "jsr:@std/fs@1/exists";
 import type { CommandContext } from "../command_handler.ts";
 import { errorToString, resolvePath, safeLstat } from "../common.ts";
 import type { ExecuteResult } from "../result.ts";

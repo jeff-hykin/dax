@@ -1,7 +1,7 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
-import { Buffer } from "@std/io/buffer";
-import { toWritableStream } from "@std/io/to-writable-stream";
-import * as path from "@std/path";
+import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
+import { Buffer } from "jsr:@std/io@0.221/buffer";
+import { toWritableStream } from "jsr:@std/io@0.221/to-writable-stream";
+import * as path from "jsr:@std/path@1";
 import { isNode } from "jsr:@david/which-runtime@0.2";
 import $ from "../mod.ts";
 import { TimeoutError } from "./common.ts";
