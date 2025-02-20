@@ -1,7 +1,7 @@
 # dax
 
-[![deno doc](https://doc.deno.land/badge.svg)](https://doc.deno.land/https/deno.land/x/dax/mod.ts)
-[![NPM Version](https://img.shields.io/npm/v/dax-sh.svg?style=flat)](http://www.npmjs.com/package/dax-sh)
+[![JSR](https://jsr.io/badges/@david/dax)](https://jsr.io/@david/dax)
+[![npm Version](https://img.shields.io/npm/v/dax-sh.svg?style=flat)](http://www.npmjs.com/package/dax-sh)
 
 <img src="src/assets/logo.svg" height="150px" alt="dax logo">
 
@@ -20,11 +20,26 @@ Cross-platform shell tools for Deno and Node.js inspired by [zx](https://github.
 1. Good for application code in addition to use as a shell script replacement.
 1. Named after my cat.
 
+## Install
+
+Deno:
+
+```sh
+# or skip and import directly from `jsr:@david/dax@<version>`
+deno add jsr:@david/dax
+```
+
+Node:
+
+```sh
+npm install dax-sh
+```
+
 ## Executing commands
 
 ```ts
 #!/usr/bin/env -S deno run --allow-all
-import $ from "https://deno.land/x/dax/mod.ts";
+import $ from "@david/dax"; // "dax-sh" in Node
 
 // run a command
 await $`echo 5`; // outputs: 5
@@ -39,8 +54,6 @@ await Promise.all([
   $`sleep 3 ; echo 3`,
 ]);
 ```
-
-Note: Above instructions are for Deno. For Node.js, install via `npm install --save-dev dax-sh` then import via `import $ from "dax-sh";`.
 
 ### Getting output
 
@@ -72,6 +85,13 @@ const result = await $`echo 1 && echo 2`.lines();
 console.log(result); // ["1", "2"]
 ```
 
+Get stderr's text:
+
+```ts
+const result = await $`deno eval "console.error(1)"`.text("stderr");
+console.log(result); // 1
+```
+
 Working with a lower level result that provides more details:
 
 ```ts
@@ -89,10 +109,10 @@ console.log(output.stdoutJson);
 Getting the combined output:
 
 ```ts
-const result = await $`deno eval 'console.log(1); console.error(2); console.log(3);'`
-  .captureCombined();
+const text = await $`deno eval 'console.log(1); console.error(2); console.log(3);'`
+  .text("combined");
 
-console.log(result.combined); // 1\n2\n3\n
+console.log(text); // 1\n2\n3\n
 ```
 
 ### Piping
@@ -171,6 +191,10 @@ If you do not want to escape arguments in a template literal, you can opt out co
 ```ts
 const args = "arg1   arg2   arg3";
 await $.raw`echo ${args}`; // executes as: echo arg1   arg2   arg3
+
+// or escape a specific argument while using $.raw
+const args2 = "arg1  arg2";
+await $.raw`echo ${$.escape(args2)} ${args2}`; // executes as: echo "arg1  arg2" arg1  arg2
 ```
 
 Providing stdout of one command to another is possible as follows:
@@ -588,7 +612,7 @@ pb.with(() => {
 
 ## Path API
 
-The path API offers an immutable [`Path`](https://deno.land/x/dax/src/path.ts?s=Path) class, which is a similar concept to Rust's `PathBuf` struct.
+The path API offers an immutable [`Path`](https://jsr.io/@david/path/doc/~/Path) class via [`jsr:@david/path`](https://jsr.io/@david/path), which is a similar concept to Rust's `PathBuf` struct.
 
 ```ts
 // create a `Path`
@@ -635,7 +659,7 @@ const pathStringFileUrl = $.path("file:///tmp"); // converts to /tmp
 const pathImportMeta = $.path(import.meta); // the path for the current module
 ```
 
-There are a lot of helper methods here, so check the [documentation on Path](https://deno.land/x/dax/src/path.ts?s=Path) for more details.
+There are a lot of helper methods here, so check the [documentation on Path](https://jsr.io/@david/path/doc/~/Path) for more details.
 
 ## Helper functions
 
@@ -747,7 +771,7 @@ await $`deno run main.ts`.stdin(request);
 await $`sleep 5 && deno run main.ts < ${request}`;
 ```
 
-See the [documentation on `RequestBuilder`](https://deno.land/x/dax/src/request.ts?s=RequestBuilder) for more details. It should be as flexible as `fetch`, but uses a builder API (ex. set headers via `.header(...)`).
+See the [documentation on `RequestBuilder`](https://jsr.io/@david/dax/doc/~/RequestBuilder) for more details. It should be as flexible as `fetch`, but uses a builder API (ex. set headers via `.header(...)`).
 
 ### Showing progress
 
@@ -852,6 +876,7 @@ Currently implemented (though not every option is supported):
 - [`unset`](https://man7.org/linux/man-pages/man1/unset.1p.html) - Unsets an environment variable.
 - [`cat`](https://man7.org/linux/man-pages/man1/cat.1.html) - Concatenate files and print on the standard output
 - [`printenv`](https://man7.org/linux/man-pages/man1/printenv.1.html) - Print all or part of environment
+- `which` - Resolves the path to an executable (`-a` flag is not supported at this time)
 - More to come. Will try to get a similar list as https://deno.land/manual/tools/task_runner#built-in-commands
 
 You can also register your own commands with the shell parser (see below).
@@ -882,7 +907,7 @@ The builder APIs are what the library uses internally and they're useful for sce
 `CommandBuilder` can be used for building up commands similar to what the tagged template `$` does:
 
 ```ts
-import { CommandBuilder } from "https://deno.land/x/dax/mod.ts";
+import { CommandBuilder } from "@david/dax";
 
 const commandBuilder = new CommandBuilder()
   .cwd("./subDir")
@@ -923,7 +948,7 @@ const result = await commandBuilder
 `RequestBuilder` can be used for building up requests similar to `$.request`:
 
 ```ts
-import { RequestBuilder } from "https://deno.land/x/dax/mod.ts";
+import { RequestBuilder } from "@david/dax";
 
 const requestBuilder = new RequestBuilder()
   .header("SOME_VALUE", "some value to send in a header");
@@ -939,7 +964,7 @@ const result = await requestBuilder
 You may wish to create your own `$` function that has a certain setup context (for example, custom commands or functions on `$`, a defined environment variable or cwd). You may do this by using the exported `build$` with `CommandBuilder` and/or `RequestBuilder`, which is essentially what the main default exported `$` uses internally to build itself. In addition, you may also add your own functions to `$`:
 
 ```ts
-import { build$, CommandBuilder, RequestBuilder } from "https://deno.land/x/dax/mod.ts";
+import { build$, CommandBuilder, RequestBuilder } from "@david/dax";
 
 // creates a $ object with the provided starting environment
 const $ = build$({

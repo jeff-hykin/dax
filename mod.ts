@@ -1,3 +1,5 @@
+import * as colors from "@std/fmt/colors";
+import { which, whichSync } from "which";
 import {
   CommandBuilder,
   escapeArg,
@@ -6,10 +8,11 @@ import {
   template,
   templateRaw,
 } from "./src/command.ts";
+import type { TemplateExpr } from "./src/command.ts";
 import {
   Box,
-  Delay,
-  DelayIterator,
+  type Delay,
+  type DelayIterator,
   delayToIterator,
   delayToMs,
   formatMillis,
@@ -19,32 +22,34 @@ import {
 } from "./src/common.ts";
 import {
   confirm,
-  ConfirmOptions,
+  type ConfirmOptions,
   maybeConfirm,
   maybeMultiSelect,
   maybePrompt,
   maybeSelect,
   multiSelect,
-  MultiSelectOptions,
+  type MultiSelectOptions,
   ProgressBar,
-  ProgressOptions,
+  type ProgressOptions,
   prompt,
-  PromptOptions,
+  type PromptOptions,
   select,
-  SelectOptions,
+  type SelectOptions,
 } from "./src/console/mod.ts";
-import { colors, outdent, which, whichSync } from "./src/deps.ts";
 import { wasmInstance } from "./src/lib/mod.ts";
-import { RequestBuilder, withProgressBarFactorySymbol } from "./src/request.ts";
-import { createPath, Path } from "./src/path.ts";
 
+import { Path } from "@david/path";
+import { RequestBuilder, withProgressBarFactorySymbol } from "./src/request.ts";
+import { outdent } from "./src/vendor/outdent.ts";
+import { denoWhichRealEnv } from "./src/shell.ts";
+
+export { type DirEntry, FsFileWrapper, Path, type SymlinkOptions } from "@david/path";
 export type { Delay, DelayIterator } from "./src/common.ts";
 export { TimeoutError } from "./src/common.ts";
-export { FsFileWrapper, Path } from "./src/path.ts";
 /** @deprecated Import `Path` instead. */
 const PathRef = Path;
+// bug in deno: https://github.com/denoland/deno_lint/pull/1262
 export { PathRef };
-export type { ExpandGlobOptions, PathSymlinkOptions, SymlinkOptions, WalkEntry, WalkOptions } from "./src/path.ts";
 export {
   CommandBuilder,
   CommandChild,
@@ -52,9 +57,9 @@ export {
   KillSignal,
   KillSignalController,
   type KillSignalListener,
+  type TemplateExpr,
 } from "./src/command.ts";
 export type { CommandContext, CommandHandler, CommandPipeReader, CommandPipeWriter } from "./src/command_handler.ts";
-export type { Closer, Reader, ShellPipeReaderKind, ShellPipeWriterKind, WriterSync } from "./src/pipes.ts";
 export type {
   ConfirmOptions,
   MultiSelectOption,
@@ -65,6 +70,7 @@ export type {
   PromptOptions,
   SelectOptions,
 } from "./src/console/mod.ts";
+export type { Closer, Reader, ShellPipeReaderKind, ShellPipeWriterKind, WriterSync } from "./src/pipes.ts";
 export { RequestBuilder, RequestResponse } from "./src/request.ts";
 // these are used when registering commands
 export type {
@@ -126,24 +132,24 @@ export type $Type<TExtras extends ExtrasObject = {}> =
 
 /** String literal template. */
 export interface $Template {
-  (strings: TemplateStringsArray, ...exprs: any[]): CommandBuilder;
+  (strings: TemplateStringsArray, ...exprs: TemplateExpr[]): CommandBuilder;
 }
 
 /**
  * `outdent` from the https://deno.land/x/outdent module.
  * @internal
  */
-type Outdent = typeof import("./src/deps.ts").outdent;
+type Outdent = typeof outdent;
 /**
  * `which` from the https://deno.land/x/which module.
  * @internal
  */
-type Which = typeof import("./src/deps.ts").which;
+type Which = typeof import("which").which;
 /**
  * `whichSync` from the https://deno.land/x/which module.
  * @internal
  */
-type WhichSync = typeof import("./src/deps.ts").whichSync;
+type WhichSync = typeof import("which").whichSync;
 
 /** Collection of built-in properties that come with a `$`. */
 export interface $BuiltInProperties<TExtras extends ExtrasObject = {}> {
@@ -499,13 +505,13 @@ export interface $BuiltInProperties<TExtras extends ExtrasObject = {}> {
    * await $`command ${exprs}`;
    * ```
    */
-  raw(strings: TemplateStringsArray, ...exprs: any[]): CommandBuilder;
+  raw(strings: TemplateStringsArray, ...exprs: TemplateExpr[]): CommandBuilder;
   /**
    * Does the provided action until it succeeds (does not throw)
    * or the specified number of retries (`count`) is hit.
    */
   withRetries<TReturn>(opts: RetryOptions<TReturn>): Promise<TReturn>;
-  /** Re-export of `deno_which` for getting the path to an executable. */
+  /** Re-export of `jsr:@david/which` for getting the path to an executable. */
   which: Which;
   /** Similar to `which`, but synchronously. */
   whichSync: WhichSync;
@@ -547,8 +553,8 @@ async function withRetries<TReturn>(
 function cd(path: string | URL | ImportMeta | Path) {
   if (typeof path === "string" || path instanceof URL) {
     path = new Path(path);
-  } else if (!(path instanceof Path)) {
-    path = new Path(path satisfies ImportMeta).parentOrThrow();
+  } else if (!(path instanceof Path) && typeof path?.url === "string") {
+    path = new Path(path.url).parentOrThrow();
   }
   Deno.chdir(path.toString());
 }
@@ -596,14 +602,14 @@ const helperObject = {
     if (commandName.toUpperCase() === "DENO") {
       return Promise.resolve(Deno.execPath());
     } else {
-      return which(commandName);
+      return which(commandName, denoWhichRealEnv);
     }
   },
   whichSync(commandName: string) {
     if (commandName.toUpperCase() === "DENO") {
       return Deno.execPath();
     } else {
-      return whichSync(commandName);
+      return whichSync(commandName, denoWhichRealEnv);
     }
   },
 };
@@ -631,7 +637,7 @@ function build$FromState<TExtras extends ExtrasObject = {}>(state: $State<TExtra
     },
   };
   const result = Object.assign(
-    (strings: TemplateStringsArray, ...exprs: any[]) => {
+    (strings: TemplateStringsArray, ...exprs: TemplateExpr[]) => {
       const textState = template(strings, exprs);
       return state.commandBuilder.getValue()[setCommandTextStateSymbol](textState);
     },
@@ -880,3 +886,12 @@ export const $: $Type = build$FromState(buildInitial$State({
   isGlobal: true,
 }));
 export default $;
+
+/** @internal */
+function createPath(path: string | URL | Path): Path {
+  if (path instanceof Path) {
+    return path;
+  } else {
+    return new Path(path);
+  }
+}

@@ -1,42 +1,48 @@
-import { CommandHandler } from "./command_handler.ts";
+import { FsFileWrapper, Path } from "@david/path";
+import * as colors from "@std/fmt/colors";
+import { Buffer } from "@std/io/buffer";
+import * as path from "@std/path";
+import { readerFromStreamReader } from "@std/streams/reader-from-stream-reader";
+import { writerFromStreamWriter } from "@std/streams/writer-from-stream-writer";
+import type { CommandHandler } from "./command_handler.ts";
+import { catCommand } from "./commands/cat.ts";
 import { cdCommand } from "./commands/cd.ts";
-import { printEnvCommand } from "./commands/printenv.ts";
 import { cpCommand, mvCommand } from "./commands/cp_mv.ts";
 import { echoCommand } from "./commands/echo.ts";
-import { catCommand } from "./commands/cat.ts";
 import { exitCommand } from "./commands/exit.ts";
 import { exportCommand } from "./commands/export.ts";
 import { mkdirCommand } from "./commands/mkdir.ts";
-import { rmCommand } from "./commands/rm.ts";
+import { printEnvCommand } from "./commands/printenv.ts";
 import { pwdCommand } from "./commands/pwd.ts";
+import { rmCommand } from "./commands/rm.ts";
 import { sleepCommand } from "./commands/sleep.ts";
 import { testCommand } from "./commands/test.ts";
 import { touchCommand } from "./commands/touch.ts";
 import { unsetCommand } from "./commands/unset.ts";
+import { whichCommand } from "./commands/which.ts";
 import { Box, delayToMs, errorToString, LoggerTreeBox } from "./common.ts";
-import { Delay } from "./common.ts";
-import { Buffer, colors, path, readerFromStreamReader, writerFromStreamWriter } from "./deps.ts";
+import type { Delay } from "./common.ts";
+import { symbols } from "./common.ts";
+import { isShowingProgressBars } from "./console/progress/interval.ts";
 import {
   CapturingBufferWriter,
   CapturingBufferWriterSync,
   InheritStaticTextBypassWriter,
   NullPipeWriter,
   PipedBuffer,
-  Reader,
-  ShellPipeReaderKind,
+  type Reader,
+  type ShellPipeReaderKind,
   ShellPipeWriter,
-  ShellPipeWriterKind,
-  Writer,
-  WriterSync,
+  type ShellPipeWriterKind,
+  type Writer,
+  type WriterSync,
 } from "./pipes.ts";
-import { parseCommand, spawn } from "./shell.ts";
-import { isShowingProgressBars } from "./console/progress/interval.ts";
-import { Path } from "./path.ts";
 import { RequestBuilder } from "./request.ts";
+import { parseCommand, spawn } from "./shell.ts";
 import { StreamFds } from "./shell.ts";
-import { symbols } from "./common.ts";
 
 type BufferStdio = "inherit" | "null" | "streamed" | Buffer;
+type StreamKind = "stdout" | "stderr" | "combined";
 
 class Deferred<T> {
   #create: () => T | Promise<T>;
@@ -51,7 +57,7 @@ class Deferred<T> {
 
 interface ShellPipeWriterKindWithOptions {
   kind: ShellPipeWriterKind;
-  options?: PipeOptions;
+  options?: StreamPipeOptions;
 }
 
 interface CommandBuilderStateCommand {
@@ -73,6 +79,7 @@ interface CommandBuilderState {
   env: Record<string, string | undefined>;
   commands: Record<string, CommandHandler>;
   cwd: string | undefined;
+  clearEnv: boolean;
   exportEnv: boolean;
   printCommand: boolean;
   printCommandLogger: LoggerTreeBox;
@@ -98,6 +105,7 @@ const builtInCommands = {
   pwd: pwdCommand,
   touch: touchCommand,
   unset: unsetCommand,
+  which: whichCommand,
 };
 
 /** @internal */
@@ -140,6 +148,7 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
     env: {},
     cwd: undefined,
     commands: { ...builtInCommands },
+    clearEnv: false,
     exportEnv: false,
     printCommand: false,
     printCommandLogger: new LoggerTreeBox(
@@ -169,6 +178,7 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
       env: { ...state.env },
       cwd: state.cwd,
       commands: { ...state.commands },
+      clearEnv: state.clearEnv,
       exportEnv: state.exportEnv,
       printCommand: state.printCommand,
       printCommandLogger: state.printCommandLogger.createChild(),
@@ -348,8 +358,8 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
 
   /** Set the stdout kind. */
   stdout(kind: ShellPipeWriterKind): CommandBuilder;
-  stdout(kind: WritableStream<Uint8Array>, options?: PipeOptions): CommandBuilder;
-  stdout(kind: ShellPipeWriterKind, options?: PipeOptions): CommandBuilder {
+  stdout(kind: WritableStream<Uint8Array>, options?: StreamPipeOptions): CommandBuilder;
+  stdout(kind: ShellPipeWriterKind, options?: StreamPipeOptions): CommandBuilder {
     return this.#newWithState((state) => {
       if (state.combinedStdoutStderr && kind !== "piped" && kind !== "inheritPiped") {
         throw new Error(
@@ -369,8 +379,8 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
 
   /** Set the stderr kind. */
   stderr(kind: ShellPipeWriterKind): CommandBuilder;
-  stderr(kind: WritableStream<Uint8Array>, options?: PipeOptions): CommandBuilder;
-  stderr(kind: ShellPipeWriterKind, options?: PipeOptions): CommandBuilder {
+  stderr(kind: WritableStream<Uint8Array>, options?: StreamPipeOptions): CommandBuilder;
+  stderr(kind: ShellPipeWriterKind, options?: StreamPipeOptions): CommandBuilder {
     return this.#newWithState((state) => {
       if (state.combinedStdoutStderr && kind !== "piped" && kind !== "inheritPiped") {
         throw new Error(
@@ -458,6 +468,18 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
   }
 
   /**
+   * Clear environmental variables from parent process.
+   *
+   * Doesn't guarantee that only `env` variables are present, as the OS may
+   * set environmental variables for processes.
+   */
+  clearEnv(value = true): CommandBuilder {
+    return this.#newWithState((state) => {
+      state.clearEnv = value;
+    });
+  }
+
+  /**
    * Prints the command text before executing the command.
    *
    * For example:
@@ -500,12 +522,13 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
    * await $`echo 1`.quiet("stderr");
    * ```
    */
-  quiet(kind: "stdout" | "stderr" | "both" = "both"): CommandBuilder {
+  quiet(kind: StreamKind | "both" = "combined"): CommandBuilder {
+    kind = kind === "both" ? "combined" : kind;
     return this.#newWithState((state) => {
-      if (kind === "both" || kind === "stdout") {
+      if (kind === "combined" || kind === "stdout") {
         state.stdout.kind = getQuietKind(state.stdout.kind);
       }
-      if (kind === "both" || kind === "stderr") {
+      if (kind === "combined" || kind === "stderr") {
         state.stderr.kind = getQuietKind(state.stderr.kind);
       }
     });
@@ -551,12 +574,14 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
    * const data = (await $`command`.quiet("stdout")).stdoutBytes;
    * ```
    */
-  async bytes(): Promise<Uint8Array> {
-    return (await this.quiet("stdout")).stdoutBytes;
+  async bytes(kind: StreamKind = "stdout"): Promise<Uint8Array> {
+    const command = kind === "combined" ? this.quiet(kind).captureCombined() : this.quiet(kind);
+    return (await command)[`${kind}Bytes`];
   }
 
   /**
-   * Sets stdout as quiet, spawns the command, and gets stdout as a string without the last newline.
+   * Sets the provided stream (stdout by default) as quiet, spawns the command, and gets the stream as a string without the last newline.
+   * Can be used to get stdout, stderr, or both.
    *
    * Shorthand for:
    *
@@ -564,18 +589,19 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
    * const data = (await $`command`.quiet("stdout")).stdout.replace(/\r?\n$/, "");
    * ```
    */
-  async text(): Promise<string> {
-    return (await this.quiet("stdout")).stdout.replace(/\r?\n$/, "");
+  async text(kind: StreamKind = "stdout"): Promise<string> {
+    const command = kind === "combined" ? this.quiet(kind).captureCombined() : this.quiet(kind);
+    return (await command)[kind].replace(/\r?\n$/, "");
   }
 
   /** Gets the text as an array of lines. */
-  async lines(): Promise<string[]> {
-    const text = await this.text();
+  async lines(kind: StreamKind = "stdout"): Promise<string[]> {
+    const text = await this.text(kind);
     return text.split(/\r?\n/g);
   }
 
   /**
-   * Sets stdout as quiet, spawns the command, and gets stdout as JSON.
+   * Sets stream (stdout by default) as quiet, spawns the command, and gets stream as JSON.
    *
    * Shorthand for:
    *
@@ -583,8 +609,8 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
    * const data = (await $`command`.quiet("stdout")).stdoutJson;
    * ```
    */
-  async json<TResult = any>(): Promise<TResult> {
-    return (await this.quiet("stdout")).stdoutJson;
+  async json<TResult = any>(kind: Exclude<StreamKind, "combined"> = "stdout"): Promise<TResult> {
+    return (await this.quiet(kind))[`${kind}Json`];
   }
 
   /** @internal */
@@ -593,7 +619,7 @@ export class CommandBuilder implements PromiseLike<CommandResult> {
   }
 
   /** @internal */
-  [setCommandTextStateSymbol](textState: CommandBuilderStateCommand) {
+  [setCommandTextStateSymbol](textState: CommandBuilderStateCommand): CommandBuilder {
     return this.#newWithState((state) => {
       state.command = textState;
     });
@@ -741,10 +767,11 @@ export function parseAndSpawnCommand(state: CommandBuilderState) {
         stdin: stdin instanceof ReadableStream ? readerFromStreamReader(stdin.getReader()) : stdin,
         stdout,
         stderr,
-        env: buildEnv(state.env),
+        env: buildEnv(state.env, state.clearEnv),
         commands: state.commands,
         cwd: state.cwd ?? Deno.cwd(),
         exportEnv: state.exportEnv,
+        clearedEnv: state.clearEnv,
         signal,
         fds,
       });
@@ -1082,8 +1109,8 @@ export class CommandResult {
   }
 }
 
-function buildEnv(env: Record<string, string | undefined>) {
-  const result = Deno.env.toObject();
+function buildEnv(env: Record<string, string | undefined>, clearEnv: boolean) {
+  const result = clearEnv ? {} : Deno.env.toObject();
   for (const [key, value] of Object.entries(env)) {
     if (value == null) {
       delete result[key];
@@ -1235,17 +1262,40 @@ export function getSignalAbortCode(signal: Deno.Signal) {
   }
 }
 
-export function template(strings: TemplateStringsArray, exprs: any[]) {
+export function template(strings: TemplateStringsArray, exprs: TemplateExpr[]) {
   return templateInner(strings, exprs, escapeArg);
 }
 
-export function templateRaw(strings: TemplateStringsArray, exprs: any[]) {
+export function templateRaw(strings: TemplateStringsArray, exprs: TemplateExpr[]) {
   return templateInner(strings, exprs, undefined);
 }
 
+export type TemplateExpr =
+  | string
+  | number
+  | boolean
+  | Path
+  | Uint8Array
+  | CommandResult
+  | { toString(): string }
+  | (string | number | boolean | Path | { toString(): string })[]
+  | ReadableStream<Uint8Array>
+  | {
+    // type is unfortuantely not that great
+    [readable: symbol]: () => ReadableStream<Uint8Array>;
+  }
+  | (() => ReadableStream<Uint8Array>)
+  // for input redirects only
+  | {
+    // type is unfortuantely not that great
+    [writable: symbol]: () => WritableStream<Uint8Array>;
+  }
+  | WritableStream<Uint8Array>
+  | (() => WritableStream<Uint8Array>);
+
 function templateInner(
   strings: TemplateStringsArray,
-  exprs: any[],
+  exprs: TemplateExpr[],
   escape: ((arg: string) => string) | undefined,
 ): CommandBuilderStateCommand {
   let nextStreamFd = 3;
@@ -1259,6 +1309,9 @@ function templateInner(
     if (exprs.length > i) {
       try {
         const expr = exprs[i];
+        if (expr == null) {
+          throw "Expression was null or undefined.";
+        }
         const inputOrOutputRedirect = detectInputOrOutputRedirect(text);
         if (inputOrOutputRedirect === "<") {
           if (expr instanceof Path) {
@@ -1274,9 +1327,9 @@ function templateInner(
             );
           } else if (expr instanceof ReadableStream) {
             handleReadableStream(() => expr);
-          } else if (expr?.[symbols.readable]) {
+          } else if ((expr as any)?.[symbols.readable]) {
             handleReadableStream(() => {
-              const stream = expr[symbols.readable]?.();
+              const stream = (expr as any)[symbols.readable]?.();
               if (!(stream instanceof ReadableStream)) {
                 throw new Error(
                   "Expected a ReadableStream or an object with a [$.symbols.readable] method " +
@@ -1285,6 +1338,8 @@ function templateInner(
               }
               return stream;
             });
+          } else if (expr instanceof FsFileWrapper) {
+            handleReadableStream(() => expr.readable);
           } else if (expr instanceof Uint8Array) {
             handleReadableStream(() => {
               return new ReadableStream({
@@ -1341,9 +1396,11 @@ function templateInner(
                 },
               });
             });
-          } else if (expr?.[symbols.writable]) {
+          } else if (expr instanceof FsFileWrapper) {
+            handleWritableStream(() => expr.writable);
+          } else if ((expr as any)?.[symbols.writable]) {
             handleWritableStream(() => {
-              const stream = expr[symbols.writable]?.();
+              const stream = (expr as any)[symbols.writable]?.();
               if (!(stream instanceof WritableStream)) {
                 throw new Error(
                   `Expected a WritableStream or an object with a [$.symbols.writable] method ` +
@@ -1438,7 +1495,7 @@ function detectInputOrOutputRedirect(text: string) {
   }
 }
 
-function templateLiteralExprToString(expr: any, escape: ((arg: string) => string) | undefined): string {
+function templateLiteralExprToString(expr: TemplateExpr, escape: ((arg: string) => string) | undefined): string {
   let result: string;
   if (typeof expr === "string") {
     result = expr;

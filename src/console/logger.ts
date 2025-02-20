@@ -1,4 +1,4 @@
-import { ConsoleSize, isOutputTty, safeConsoleSize, staticText, TextItem } from "./utils.ts";
+import { type ConsoleSize, isOutputTty, safeConsoleSize, staticText, type TextItem } from "./utils.ts";
 
 export enum LoggerRefreshItemKind {
   ProgressBars,

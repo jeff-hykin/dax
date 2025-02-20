@@ -1,21 +1,23 @@
-import { KillSignal } from "./command.ts";
-import { CommandContext, CommandHandler, type CommandPipeReader } from "./command_handler.ts";
-import { errorToString, getExecutableShebangFromPath, ShebangInfo } from "./common.ts";
-import { DenoWhichRealEnvironment, fs, path, which } from "./deps.ts";
+import { existsSync } from "@std/fs/exists";
+import * as path from "@std/path";
+import { RealEnvironment as DenoWhichRealEnvironment, which } from "which";
+import type { KillSignal } from "./command.ts";
+import type { CommandContext, CommandHandler, CommandPipeReader } from "./command_handler.ts";
+import { errorToString, getExecutableShebangFromPath, type ShebangInfo } from "./common.ts";
 import { wasmInstance } from "./lib/mod.ts";
 import {
   NullPipeReader,
   NullPipeWriter,
   pipeReadableToWriterSync,
   PipeSequencePipe,
-  PipeWriter,
-  Reader,
-  ShellPipeReaderKind,
+  type PipeWriter,
+  type Reader,
+  type ShellPipeReaderKind,
   ShellPipeWriter,
-  ShellPipeWriterKind,
+  type ShellPipeWriterKind,
 } from "./pipes.ts";
-import { EnvChange, ExecuteResult, getAbortedResult } from "./result.ts";
-import { SpawnedChildProcess } from "./runtimes/process.common.ts";
+import { type EnvChange, type ExecuteResult, getAbortedResult } from "./result.ts";
+import type { SpawnedChildProcess } from "./runtimes/process.common.ts";
 import { spawnCommand } from "./runtimes/process.deno.ts";
 
 const neverAbortedSignal = new AbortController().signal;
@@ -231,6 +233,41 @@ class ShellEnv implements Env {
   }
 
   clone() {
+    return cloneEnv(this);
+  }
+}
+
+/**
+ * Like {@link RealEnv} but any read actions will access values that were only set through it
+ * or return undefined.
+ */
+class RealEnvWriteOnly implements Env {
+  real = new RealEnv();
+  shell = new ShellEnv();
+
+  setCwd(cwd: string) {
+    this.real.setCwd(cwd);
+    this.shell.setCwd(cwd);
+  }
+
+  getCwd() {
+    return this.shell.getCwd();
+  }
+
+  setEnvVar(key: string, value: string | undefined) {
+    this.real.setEnvVar(key, value);
+    this.shell.setEnvVar(key, value);
+  }
+
+  getEnvVar(key: string) {
+    return this.shell.getEnvVar(key);
+  }
+
+  getEnvVars() {
+    return this.shell.getEnvVars();
+  }
+
+  clone(): Env {
     return cloneEnv(this);
   }
 }
@@ -479,12 +516,13 @@ export interface SpawnOpts {
   commands: Record<string, CommandHandler>;
   cwd: string;
   exportEnv: boolean;
+  clearedEnv: boolean;
   signal: KillSignal;
   fds: StreamFds | undefined;
 }
 
 export async function spawn(list: SequentialList, opts: SpawnOpts) {
-  const env = opts.exportEnv ? new RealEnv() : new ShellEnv();
+  const env = opts.exportEnv ? opts.clearedEnv ? new RealEnvWriteOnly() : new RealEnv() : new ShellEnv();
   initializeEnv(env, opts);
   const context = new Context({
     env,
@@ -897,7 +935,7 @@ async function executeSimpleCommand(command: SimpleCommand, parentContext: Conte
 }
 
 function checkMapCwdNotExistsError(cwd: string, err: unknown) {
-  if ((err as any).code === "ENOENT" && !fs.existsSync(cwd)) {
+  if ((err as any).code === "ENOENT" && !existsSync(cwd)) {
     throw new Error(`Failed to launch command because the cwd does not exist (${cwd}).`, {
       cause: err,
     });
@@ -906,19 +944,44 @@ function checkMapCwdNotExistsError(cwd: string, err: unknown) {
   }
 }
 
-async function executeCommandArgs(commandArgs: string[], context: Context): Promise<ExecuteResult> {
+function executeCommandArgs(commandArgs: string[], context: Context): Promise<ExecuteResult> {
   // look for a registered command first
-  const command = context.getCommand(commandArgs[0]);
+  const commandName = commandArgs.shift()!;
+  const command = context.getCommand(commandName);
   if (command != null) {
-    return command(context.asCommandContext(commandArgs.slice(1)));
+    return Promise.resolve(command(context.asCommandContext(commandArgs)));
   }
 
   // fall back to trying to resolve the command on the fs
-  const resolvedCommand = await resolveCommand(commandArgs[0], context);
+  const unresolvedCommand: UnresolvedCommand = {
+    name: commandName,
+    baseDir: context.getCwd(),
+  };
+  return executeUnresolvedCommand(unresolvedCommand, commandArgs, context);
+}
+
+async function executeUnresolvedCommand(
+  unresolvedCommand: UnresolvedCommand,
+  commandArgs: string[],
+  context: Context,
+): Promise<ExecuteResult> {
+  const resolvedCommand = await resolveCommand(unresolvedCommand, context);
+  if (resolvedCommand === false) {
+    context.stderr.writeLine(`dax: ${unresolvedCommand.name}: command not found`);
+    return { code: 127 };
+  }
   if (resolvedCommand.kind === "shebang") {
-    return executeCommandArgs([...resolvedCommand.args, resolvedCommand.path, ...commandArgs.slice(1)], context);
+    return executeUnresolvedCommand(resolvedCommand.command, [...resolvedCommand.args, ...commandArgs], context);
   }
   const _assertIsPath: "path" = resolvedCommand.kind;
+  return executeCommandAtPath(resolvedCommand.path, commandArgs, context);
+}
+
+async function executeCommandAtPath(
+  commandPath: string,
+  commandArgs: string[],
+  context: Context,
+): Promise<ExecuteResult> {
   const pipeStringVals = {
     stdin: getStdioStringValue(context.stdin),
     stdout: getStdioStringValue(context.stdout.kind),
@@ -927,8 +990,8 @@ async function executeCommandArgs(commandArgs: string[], context: Context): Prom
   let p: SpawnedChildProcess;
   const cwd = context.getCwd();
   try {
-    p = spawnCommand(resolvedCommand.path, {
-      args: commandArgs.slice(1),
+    p = spawnCommand(commandPath, {
+      args: commandArgs,
       cwd,
       env: context.getEnvVars(),
       clearEnv: true,
@@ -1092,7 +1155,7 @@ function pipeCommandPipeReaderToWriterSync(
   }
 }
 
-type ResolvedCommand = ResolvedPathCommand | ResolvedShebangCommand;
+type ResolvedCommand = ResolvedPathCommand | ResolvedShebangCommand | false;
 
 interface ResolvedPathCommand {
   kind: "path";
@@ -1101,59 +1164,82 @@ interface ResolvedPathCommand {
 
 interface ResolvedShebangCommand {
   kind: "shebang";
-  path: string;
+  command: UnresolvedCommand;
   args: string[];
 }
 
-async function resolveCommand(commandName: string, context: Context): Promise<ResolvedCommand> {
-  if (commandName.includes("/") || commandName.includes("\\")) {
-    if (!path.isAbsolute(commandName)) {
-      commandName = path.resolve(context.getCwd(), commandName);
-    }
+interface UnresolvedCommand {
+  name: string;
+  baseDir: string;
+}
+
+async function resolveCommand(unresolvedCommand: UnresolvedCommand, context: Context): Promise<ResolvedCommand> {
+  if (unresolvedCommand.name.includes("/") || Deno.build.os === "windows" && unresolvedCommand.name.includes("\\")) {
+    const commandPath = path.isAbsolute(unresolvedCommand.name)
+      ? unresolvedCommand.name
+      : path.resolve(unresolvedCommand.baseDir, unresolvedCommand.name);
     // only bother checking for a shebang when the path has a slash
     // in it because for global commands someone on Windows likely
     // won't have a script with a shebang in it on Windows
-    const result = await getExecutableShebangFromPath(commandName);
+    const result = await getExecutableShebangFromPath(commandPath);
     if (result === false) {
-      throw new Error(`Command not found: ${commandName}`);
+      return false;
     } else if (result != null) {
+      const args = await parseShebangArgs(result, context);
+      const name = args.shift()!;
+      args.push(commandPath);
       return {
         kind: "shebang",
-        path: commandName,
-        args: await parseShebangArgs(result, context),
+        command: {
+          name,
+          baseDir: path.dirname(commandPath),
+        },
+        args,
       };
     } else {
       const _assertUndefined: undefined = result;
       return {
         kind: "path",
-        path: commandName,
+        path: commandPath,
       };
     }
   }
 
-  // always use the current executable for "deno"
-  if (commandName.toUpperCase() === "DENO") {
-    return {
-      kind: "path",
-      path: Deno.execPath(),
-    };
-  }
-
-  const realEnvironment = new DenoWhichRealEnvironment();
-  const commandPath = await which(commandName, {
-    os: Deno.build.os,
-    stat: realEnvironment.stat,
-    env(key) {
-      return context.getVar(key);
-    },
-  });
+  const commandPath = await whichFromContext(unresolvedCommand.name, context);
   if (commandPath == null) {
-    throw new Error(`Command not found: ${commandName}`);
+    return false;
   }
   return {
     kind: "path",
     path: commandPath,
   };
+}
+
+class WhichEnv extends DenoWhichRealEnvironment {
+  requestPermission(folderPath: string) {
+    Deno.permissions.requestSync({
+      name: "read",
+      path: folderPath,
+    });
+  }
+}
+export const denoWhichRealEnv = new WhichEnv();
+
+export async function whichFromContext(commandName: string, context: {
+  getVar(key: string): string | undefined;
+}) {
+  // always use the current executable for "deno"
+  if (commandName.toUpperCase() === "DENO") {
+    return Deno.execPath();
+  }
+  return await which(commandName, {
+    os: Deno.build.os,
+    stat: denoWhichRealEnv.stat,
+    env(key) {
+      return context.getVar(key);
+    },
+    requestPermission: denoWhichRealEnv.requestPermission,
+  });
 }
 
 async function executePipeSequence(sequence: PipeSequence, context: Context): Promise<ExecuteResult> {

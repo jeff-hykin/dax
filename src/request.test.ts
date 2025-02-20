@@ -1,9 +1,12 @@
-import { Buffer, path } from "./deps.ts";
-import { assert, assertEquals, assertRejects, isNode, toWritableStream } from "./deps.test.ts";
-import { RequestBuilder } from "./request.ts";
-import { startServer } from "./test/server.deno.ts";
+import { assert, assertEquals, assertRejects } from "@std/assert";
+import { Buffer } from "@std/io/buffer";
+import { toWritableStream } from "@std/io/to-writable-stream";
+import * as path from "@std/path";
+import { isNode } from "which_runtime";
 import $ from "../mod.ts";
 import { TimeoutError } from "./common.ts";
+import { RequestBuilder } from "./request.ts";
+import { startServer } from "./test/server.deno.ts";
 
 async function withServer(action: (serverUrl: URL) => Promise<void>) {
   const server = await startServer({
@@ -42,22 +45,20 @@ async function withServer(action: (serverUrl: URL) => Promise<void>) {
         return new Response(
           new ReadableStream({
             start(controller) {
-              return new Promise<void>((resolve, reject) => {
+              return new Promise<void>((resolve, _reject) => {
                 if (signal.aborted || abortController.signal.aborted) {
                   return;
                 }
-                const timeoutId = setTimeout(() => {
+                const abortListener = () => {
+                  clearTimeout(timeoutId);
                   controller.close();
                   resolve();
-                }, ms);
-                signal.addEventListener("abort", () => {
-                  clearTimeout(timeoutId);
-                  reject(new Error("Client aborted."));
-                });
-                abortController.signal.addEventListener("abort", () => {
-                  clearTimeout(timeoutId);
-                  reject(new Error("Client aborted."));
-                });
+                  signal.removeEventListener("abort", abortListener);
+                  abortController.signal.removeEventListener("abort", abortListener);
+                };
+                const timeoutId = setTimeout(abortListener, ms);
+                signal.addEventListener("abort", abortListener);
+                abortController.signal.addEventListener("abort", abortListener);
               });
             },
             cancel(reason) {
@@ -147,8 +148,16 @@ Deno.test("$.request", (t) => {
         .showProgress()
         .pipeThrough(new TextDecoderStream());
       const reader = readable.getReader();
-      const result = await reader.read();
-      assertEquals(result.value, "text".repeat(1000));
+      let result = "";
+      let done = false;
+      while (!done) {
+        const chunkResult = await reader.read();
+        done = chunkResult.done;
+        if (chunkResult.value) {
+          result += chunkResult.value;
+        }
+      }
+      assertEquals(result, "text".repeat(1000));
     });
 
     step("pipeToPath", async () => {
@@ -289,7 +298,7 @@ Deno.test("$.request", (t) => {
       let caughtErr: TimeoutError | undefined;
       try {
         await response.text();
-      } catch (err) {
+      } catch (err: any) {
         caughtErr = err;
       }
       if (isNode) {

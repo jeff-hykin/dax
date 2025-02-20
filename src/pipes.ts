@@ -1,40 +1,18 @@
-import { type FsFileWrapper, Path } from "./path.ts";
-import { logger } from "./console/logger.ts";
-import { Buffer, writeAll, writeAllSync } from "./deps.ts";
-import type { RequestBuilder } from "./request.ts";
+import type { FsFileWrapper, Path } from "@david/path";
+import { Buffer } from "@std/io/buffer";
+import { writeAll, writeAllSync } from "@std/io/write-all";
 import type { CommandBuilder, KillSignal } from "./command.ts";
 import { abortSignalToPromise } from "./common.ts";
+import { logger } from "./console/logger.ts";
+import type { RequestBuilder } from "./request.ts";
+import type { Closer, Reader, ReaderSync, Writer, WriterSync } from "@std/io/types";
+export type { Closer, Reader, ReaderSync, Writer, WriterSync };
 
 const encoder = new TextEncoder();
-
-/** `Deno.Reader` stream. */
-export interface Reader {
-  read(p: Uint8Array): Promise<number | null>;
-}
-
-/** `Deno.ReaderSync` stream. */
-export interface ReaderSync {
-  readSync(p: Uint8Array): number | null;
-}
-
-/** `Deno.WriterSync` stream. */
-export interface WriterSync {
-  writeSync(p: Uint8Array): number;
-}
-
-/** `Deno.Writer` stream. */
-export interface Writer {
-  write(p: Uint8Array): Promise<number>;
-}
 
 export type PipeReader = Reader | ReaderSync;
 
 export type PipeWriter = Writer | WriterSync;
-
-/** `Deno.Closer` */
-export interface Closer {
-  close(): void;
-}
 
 /** Behaviour to use for stdin.
  * @value "inherit" - Sends the stdin of the process to the shell (default).

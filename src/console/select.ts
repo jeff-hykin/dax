@@ -1,5 +1,5 @@
-import { colors } from "../deps.ts";
-import { createSelection, Keys, resultOrExit, SelectionOptions, TextItem } from "./utils.ts";
+import * as colors from "@std/fmt/colors";
+import { createSelection, Keys, resultOrExit, type SelectionOptions, type TextItem } from "./utils.ts";
 
 /** Options for showing a selection that only has one result. */
 export interface SelectOptions {
@@ -21,8 +21,8 @@ export function select(opts: SelectOptions) {
 }
 
 export function maybeSelect(opts: SelectOptions) {
-  if (opts.options.length <= 1) {
-    throw new Error(`You must provide at least two options. (Prompt: '${opts.message}')`);
+  if (opts.options.length < 1) {
+    throw new Error(`You must provide at least one option. (Prompt: '${opts.message}')`);
   }
 
   return createSelection({

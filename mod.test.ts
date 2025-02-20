@@ -1,28 +1,23 @@
-import { readAll, readerFromStreamReader } from "./src/deps.ts";
+import { assert, assertEquals, assertMatch, assertRejects, assertStringIncludes, assertThrows } from "@std/assert";
+import * as colors from "@std/fmt/colors";
+import { Buffer } from "@std/io/buffer";
+import { readAll } from "@std/io/read-all";
+import { toWritableStream } from "@std/io/to-writable-stream";
+import * as path from "@std/path";
+import { readerFromStreamReader } from "@std/streams/reader-from-stream-reader";
+import { isNode } from "which_runtime";
 import $, {
   build$,
   CommandBuilder,
-  CommandContext,
-  CommandHandler,
+  type CommandContext,
+  type CommandHandler,
   KillSignal,
   KillSignalController,
   Path,
   PathRef,
 } from "./mod.ts";
-import {
-  assert,
-  assertEquals,
-  assertMatch,
-  assertRejects,
-  assertStringIncludes,
-  assertThrows,
-  isNode,
-  toWritableStream,
-  usingTempDir,
-  withTempDir,
-} from "./src/deps.test.ts";
-import { Buffer, colors, path } from "./src/deps.ts";
 import { setNotTtyForTesting } from "./src/console/utils.ts";
+import { usingTempDir, withTempDir } from "./src/with_temp_dir.ts";
 
 // Deno will not be a tty because it captures the pipes, but Node
 // will be, so manually say that we're not a tty for testing so
@@ -157,6 +152,22 @@ Deno.test("should error setting stdout after getting combined output", () => {
   }
 });
 
+Deno.test("should get output as bytes", async () => {
+  {
+    const output = await $`echo 5 && deno eval 'console.error(1);'`.bytes();
+    assertEquals(new TextDecoder().decode(output), "5\n");
+  }
+  {
+    const output = await $`echo 5 && deno eval 'console.error(1);'`.bytes("combined");
+    assertEquals(new TextDecoder().decode(output), "5\n1\n");
+  }
+  {
+    const output = await $`echo 5 && deno eval 'console.error(1);'`.env("NOCOLOR", "1")
+      .bytes("stderr");
+    assertEquals(new TextDecoder().decode(output), "1\n");
+  }
+});
+
 Deno.test("should throw when exit code is non-zero", async () => {
   await assertRejects(
     async () => {
@@ -192,6 +203,12 @@ Deno.test("should throw when exit code is non-zero", async () => {
   );
 });
 
+Deno.test("should error in the shell when the command can't be found", async () => {
+  const output = await $`nonexistentcommanddaxtest`.noThrow().stderr("piped");
+  assertEquals(output.code, 127);
+  assertEquals(output.stderr, "dax: nonexistentcommanddaxtest: command not found\n");
+});
+
 Deno.test("throws when providing an object that doesn't override toString", async () => {
   {
     const obj1 = {};
@@ -212,7 +229,7 @@ Deno.test("throws when providing an object that doesn't override toString", asyn
   }
   class Test {
     toString() {
-      return 1;
+      return "1";
     }
   }
   {
@@ -263,10 +280,20 @@ Deno.test("CommandBuilder#json()", async () => {
   assertEquals(output, { test: 5 });
 });
 
+Deno.test("CommandBuilder#json('stderr')", async () => {
+  const output = await $`deno eval "console.error(JSON.stringify({ test: 5 }));"`.json("stderr");
+  assertEquals(output, { test: 5 });
+});
+
 Deno.test("stderrJson", async () => {
   const output = await $`deno eval "console.error(JSON.stringify({ test: 5 }));"`.stderr("piped");
   assertEquals(output.stderrJson, { test: 5 });
   assertEquals(output.stderrJson === output.stderrJson, true); // should be memoized
+});
+
+Deno.test("stderr text", async () => {
+  const result = await $`deno eval "console.error(1)"`.env("NO_COLOR", "1").text("stderr");
+  assertEquals(result, "1");
 });
 
 Deno.test("should handle interpolation", async () => {
@@ -490,11 +517,9 @@ Deno.test("should not allow invalid command names", () => {
 
 Deno.test("should unregister commands", async () => {
   const builder = new CommandBuilder().unregisterCommand("export").noThrow();
-  await assertRejects(
-    async () => await builder.command("export somewhere"),
-    Error,
-    "Command not found: export",
-  );
+  const output = await builder.command("export somewhere").stderr("piped");
+  assertEquals(output.code, 127);
+  assertEquals(output.stderr, "dax: export: command not found\n");
 });
 
 Deno.test("sleep command", async () => {
@@ -679,6 +704,38 @@ Deno.test("exporting env should modify real environment when something changed v
   } finally {
     Deno.env.delete(envName);
     Deno.chdir(previousCwd);
+  }
+});
+
+Deno.test("env should be clean slate when clearEnv is set", async () => {
+  {
+    const text = await $`printenv`.clearEnv().text();
+    assertEquals(text, "");
+  }
+  Deno.env.set("DAX_TVAR", "123");
+  try {
+    const text = await $`deno eval --no-config 'console.log("DAX_TVAR: " + Deno.env.get("DAX_TVAR"))'`.clearEnv()
+      .text();
+    assertEquals(text, "DAX_TVAR: undefined");
+  } finally {
+    Deno.env.delete("DAX_TVAR");
+  }
+});
+
+Deno.test("clearEnv + exportEnv should not clear out real environment", async () => {
+  Deno.env.set("DAX_TVAR", "123");
+  try {
+    const text =
+      await $`deno eval --no-config 'console.log("VAR: " + Deno.env.get("DAX_TVAR") + " VAR2: " + Deno.env.get("DAX_TVAR2"))'`
+        .env("DAX_TVAR2", "shake it shake")
+        .clearEnv()
+        .exportEnv()
+        .text();
+    assertEquals(text, "VAR: undefined VAR2: shake it shake");
+    assertEquals(Deno.env.get("DAX_TVAR2"), "shake it shake");
+  } finally {
+    Deno.env.delete("DAX_TVAR");
+    Deno.env.delete("DAX_TVAR2");
   }
 });
 
@@ -1124,6 +1181,16 @@ Deno.test("command .lines()", async () => {
   assertEquals(result, ["1", "2"]);
 });
 
+Deno.test("command .lines('stderr')", async () => {
+  const result = await $`deno eval "console.error(1); console.error(2)"`.env("NO_COLOR", "1").lines("stderr");
+  assertEquals(result, ["1", "2"]);
+});
+
+Deno.test("command .lines('combined')", async () => {
+  const result = await $`deno eval "console.log(1); console.error(2)"`.lines("combined");
+  assertEquals(result.sort(), ["1", "2"]);
+});
+
 Deno.test("piping in command", async () => {
   await withTempDir(async (tempDir) => {
     const result = await $`echo 1 | cat - > output.txt`.cwd(tempDir).text();
@@ -1438,7 +1505,7 @@ Deno.test("shebang support", async (t) => {
             .text();
         },
         Error,
-        "Command not found: deno run",
+        "Exited with code: 127",
       );
     });
 
@@ -1456,6 +1523,25 @@ Deno.test("shebang support", async (t) => {
         ].join("\n"),
       );
       const output = await $`./file3.ts`
+        .cwd(dir)
+        .text();
+      assertEquals(output, "Hello");
+    });
+
+    step("relative sub dir", async () => {
+      dir.join("echo_stdin2.ts").writeTextSync(
+        [
+          "#!/usr/bin/env -S deno run --allow-run",
+          "await new Deno.Command('deno', { args: ['run', ...Deno.args] }).spawn();",
+        ].join("\n"),
+      );
+      dir.join("sub/sub.ts").writeTextSync(
+        [
+          "#!/usr/bin/env ../echo_stdin2.ts",
+          "console.log('Hello')",
+        ].join("\n"),
+      );
+      const output = await $`./sub/sub.ts`
         .cwd(dir)
         .text();
       assertEquals(output, "Hello");
@@ -2129,6 +2215,65 @@ Deno.test("nice error message when not awaiting a CommandBuilder", async () => {
     "Providing a command builder is not yet supported (https://github.com/dsherret/dax/issues/239). " +
       "Await the command builder's text before using it in an expression (ex. await $`cmd`.text()).",
   );
+});
+
+Deno.test("which uses same as $.which", async () => {
+  {
+    const whichFnOutput = await $.which("deno");
+    const whichShellOutput = await $`which deno`.text();
+    if (Deno.build.os === "windows") {
+      // windows is case insensitive
+      assertEquals(whichFnOutput?.toLowerCase(), whichShellOutput.toLowerCase());
+    } else {
+      assertEquals(whichFnOutput, whichShellOutput);
+    }
+  }
+  // arg not found
+  {
+    const whichShellOutput = await $`which non-existent-command-that-not-exists`
+      .noThrow()
+      .stderr("piped")
+      .stdout("piped");
+    assertEquals(whichShellOutput.stderr, "");
+    assertEquals(whichShellOutput.stdout, "");
+    assertEquals(whichShellOutput.code, 1);
+  }
+  // invalid args
+  {
+    const whichShellOutput = await $`which deno test`
+      .noThrow()
+      .stderr("piped")
+      .stdout("piped");
+    assertEquals(whichShellOutput.stderr, "which: unsupported too many arguments\n");
+    assertEquals(whichShellOutput.stdout, "");
+    assertEquals(whichShellOutput.code, 2);
+  }
+  // invalid arg kind
+  {
+    const whichShellOutput = await $`which -h`
+      .noThrow()
+      .stderr("piped")
+      .stdout("piped");
+    assertEquals(whichShellOutput.stderr, "which: unsupported flag: -h\n");
+    assertEquals(whichShellOutput.stdout, "");
+    assertEquals(whichShellOutput.code, 2);
+  }
+});
+
+Deno.test("expect error undefined", async () => {
+  await assertRejects(async () => {
+    // @ts-expect-error undefined not assignable
+    await $`echo ${undefined}`;
+  });
+  await assertRejects(async () => {
+    // @ts-expect-error null not assignable
+    await $`echo ${null}`;
+  });
+});
+
+Deno.test("resolve command by path", async () => {
+  const version = await $`${Deno.execPath()} --version`.text();
+  assert(typeof version === "string");
 });
 
 function ensurePromiseNotResolved(promise: Promise<unknown>) {
