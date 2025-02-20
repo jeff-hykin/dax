@@ -1,4 +1,4 @@
-import * as colors from "jsr:@std/fmt@1/colors";
+import * as colors from "https://esm.sh/jsr/@std/fmt@1/colors";
 import { type ConsoleSize, isOutputTty, safeConsoleSize, type TextItem } from "../utils.ts";
 import { humanDownloadSize } from "./format.ts";
 import { addProgressBar, forceRender, removeProgressBar, type RenderIntervalProgressBar } from "./interval.ts";

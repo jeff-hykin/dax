@@ -1,5 +1,5 @@
-import { assertEquals } from "jsr:@std/assert@1";
-import { Buffer } from "jsr:@std/io@0.221/buffer";
+import { assertEquals } from "https://esm.sh/jsr/@std/assert@1";
+import { Buffer } from "https://esm.sh/jsr/@std/io@0.221/buffer";
 import { InheritStaticTextBypassWriter } from "./pipes.ts";
 
 Deno.test("should line buffer the inherit static text bypass writer", () => {

@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert@1";
+import { assertEquals, assertThrows } from "https://esm.sh/jsr/@std/assert@1";
 import { parseCatArgs } from "./cat.ts";
 
 Deno.test("test cat parse args", () => {

@@ -1,5 +1,5 @@
-import { build, emptyDir } from "jsr:@deno/dnt@~0.41.3";
-import { walkSync } from "jsr:@std/fs@1/walk";
+import { build, emptyDir } from "https://esm.sh/jsr/@deno/dnt@~0.41.3";
+import { walkSync } from "https://esm.sh/jsr/@std/fs@1/walk";
 import $ from "../mod.ts";
 
 $.cd($.path(import.meta.url).parentOrThrow().parentOrThrow());
@@ -66,7 +66,7 @@ await build({
     }],
   },
   filterDiagnostic(diagnostic) {
-    return !diagnostic.file?.fileName.includes("jsr:@david/path@0.2/0.2.0/mod.ts") ?? true;
+    return !diagnostic.file?.fileName.includes("https://esm.sh/jsr/@david/path@0.2/0.2.0/mod.ts") ?? true;
   },
   compilerOptions: {
     stripInternal: false,

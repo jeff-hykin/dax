@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertThrows } from "https://esm.sh/jsr/@std/assert@1";
 import { parseArgs } from "./pwd.ts";
 
 Deno.test("pwd: parseArgs", () => {

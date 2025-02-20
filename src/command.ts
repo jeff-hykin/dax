@@ -1,9 +1,9 @@
-import { FsFileWrapper, Path } from "jsr:@david/path@0.2";
-import * as colors from "jsr:@std/fmt@1/colors";
-import { Buffer } from "jsr:@std/io@0.221/buffer";
-import * as path from "jsr:@std/path@1";
-import { readerFromStreamReader } from "jsr:@std/streams@0.221/reader-from-stream-reader";
-import { writerFromStreamWriter } from "jsr:@std/streams@0.221/writer-from-stream-writer";
+import { FsFileWrapper, Path } from "https://esm.sh/jsr/@david/path@0.2";
+import * as colors from "https://esm.sh/jsr/@std/fmt@1/colors";
+import { Buffer } from "https://esm.sh/jsr/@std/io@0.221/buffer";
+import * as path from "https://esm.sh/jsr/@std/path@1";
+import { readerFromStreamReader } from "https://esm.sh/jsr/@std/streams@0.221/reader-from-stream-reader";
+import { writerFromStreamWriter } from "https://esm.sh/jsr/@std/streams@0.221/writer-from-stream-writer";
 import type { CommandHandler } from "./command_handler.ts";
 import { catCommand } from "./commands/cat.ts";
 import { cdCommand } from "./commands/cd.ts";

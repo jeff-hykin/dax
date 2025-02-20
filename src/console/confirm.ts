@@ -1,4 +1,4 @@
-import * as colors from "jsr:@std/fmt@1/colors";
+import * as colors from "https://esm.sh/jsr/@std/fmt@1/colors";
 import { createSelection, Keys, resultOrExit, type SelectionOptions, type TextItem } from "./utils.ts";
 
 /** Options for showing confirming a yes or no question. */

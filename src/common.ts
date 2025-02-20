@@ -1,5 +1,5 @@
-import { BufReader } from "jsr:@std/io@0.221/buf-reader";
-import * as path from "jsr:@std/path@1";
+import { BufReader } from "https://esm.sh/jsr/@std/io@0.221/buf-reader";
+import * as path from "https://esm.sh/jsr/@std/path@1";
 import { logger } from "./console/mod.ts";
 import type { Reader } from "./pipes.ts";
 

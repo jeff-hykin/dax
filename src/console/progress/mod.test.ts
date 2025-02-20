@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "https://esm.sh/jsr/@std/assert@1";
 import { wasmInstance } from "../../lib/mod.ts";
 import { renderProgressBar } from "./mod.ts";
 

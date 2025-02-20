@@ -1,8 +1,8 @@
-import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
-import { Buffer } from "jsr:@std/io@0.221/buffer";
-import { toWritableStream } from "jsr:@std/io@0.221/to-writable-stream";
-import * as path from "jsr:@std/path@1";
-import { isNode } from "jsr:@david/which-runtime@0.2";
+import { assert, assertEquals, assertRejects } from "https://esm.sh/jsr/@std/assert@1";
+import { Buffer } from "https://esm.sh/jsr/@std/io@0.221/buffer";
+import { toWritableStream } from "https://esm.sh/jsr/@std/io@0.221/to-writable-stream";
+import * as path from "https://esm.sh/jsr/@std/path@1";
+import { isNode } from "https://esm.sh/jsr/@david/which-runtime@0.2";
 import $ from "../mod.ts";
 import { TimeoutError } from "./common.ts";
 import { RequestBuilder } from "./request.ts";

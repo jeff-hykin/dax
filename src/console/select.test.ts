@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "https://esm.sh/jsr/@std/assert@1";
 import { innerSelect } from "./select.ts";
 import { createTester } from "./testUtils.ts";
 import { Keys } from "./utils.ts";

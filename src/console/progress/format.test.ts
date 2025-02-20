@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "https://esm.sh/jsr/@std/assert@1";
 import { humanDownloadSize } from "./format.ts";
 
 Deno.test("should format bytes", () => {

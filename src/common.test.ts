@@ -1,6 +1,6 @@
-import { assertEquals } from "jsr:@std/assert@1";
-import { Buffer } from "jsr:@std/io@0.221/buffer";
-import * as path from "jsr:@std/path@1";
+import { assertEquals } from "https://esm.sh/jsr/@std/assert@1";
+import { Buffer } from "https://esm.sh/jsr/@std/io@0.221/buffer";
+import * as path from "https://esm.sh/jsr/@std/path@1";
 import {
   delayToIterator,
   delayToMs,

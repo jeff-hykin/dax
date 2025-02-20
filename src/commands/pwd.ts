@@ -1,4 +1,4 @@
-import * as path from "jsr:@std/path@1";
+import * as path from "https://esm.sh/jsr/@std/path@1";
 import type { CommandContext } from "../command_handler.ts";
 import { errorToString } from "../common.ts";
 import type { ExecuteResult } from "../result.ts";

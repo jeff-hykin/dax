@@ -1,4 +1,4 @@
-import { Path } from "jsr:@david/path@0.2";
+import { Path } from "https://esm.sh/jsr/@david/path@0.2";
 
 /**
  * Creates a temporary directory, changes the cwd to this directory,

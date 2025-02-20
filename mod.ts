@@ -1,5 +1,5 @@
-import * as colors from "jsr:@std/fmt@1/colors";
-import { which, whichSync } from "jsr:@david/which@~0.4.1";
+import * as colors from "https://esm.sh/jsr/@std/fmt@1/colors";
+import { which, whichSync } from "https://esm.sh/jsr/@david/which@~0.4.1";
 import {
   CommandBuilder,
   escapeArg,
@@ -38,12 +38,12 @@ import {
 } from "./src/console/mod.ts";
 import { wasmInstance } from "./src/lib/mod.ts";
 
-import { Path } from "jsr:@david/path@0.2";
+import { Path } from "https://esm.sh/jsr/@david/path@0.2";
 import { RequestBuilder, withProgressBarFactorySymbol } from "./src/request.ts";
 import { outdent } from "./src/vendor/outdent.ts";
 import { denoWhichRealEnv } from "./src/shell.ts";
 
-export { type DirEntry, FsFileWrapper, Path, type SymlinkOptions } from "jsr:@david/path@0.2";
+export { type DirEntry, FsFileWrapper, Path, type SymlinkOptions } from "https://esm.sh/jsr/@david/path@0.2";
 export type { Delay, DelayIterator } from "./src/common.ts";
 export { TimeoutError } from "./src/common.ts";
 /** @deprecated Import `Path` instead. */
@@ -144,12 +144,12 @@ type Outdent = typeof outdent;
  * `which` from the https://deno.land/x/which module.
  * @internal
  */
-type Which = typeof import("which").which;
+type Which = typeof import("https://esm.sh/jsr/@david/which@~0.4.1").which;
 /**
  * `whichSync` from the https://deno.land/x/which module.
  * @internal
  */
-type WhichSync = typeof import("which").whichSync;
+type WhichSync = typeof import("https://esm.sh/jsr/@david/which@~0.4.1").whichSync;
 
 /** Collection of built-in properties that come with a `$`. */
 export interface $BuiltInProperties<TExtras extends ExtrasObject = {}> {

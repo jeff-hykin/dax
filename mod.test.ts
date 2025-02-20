@@ -1,11 +1,11 @@
-import { assert, assertEquals, assertMatch, assertRejects, assertStringIncludes, assertThrows } from "jsr:@std/assert@1";
-import * as colors from "jsr:@std/fmt@1/colors";
-import { Buffer } from "jsr:@std/io@0.221/buffer";
-import { readAll } from "jsr:@std/io@0.221/read-all";
-import { toWritableStream } from "jsr:@std/io@0.221/to-writable-stream";
-import * as path from "jsr:@std/path@1";
-import { readerFromStreamReader } from "jsr:@std/streams@0.221/reader-from-stream-reader";
-import { isNode } from "jsr:@david/which-runtime@0.2";
+import { assert, assertEquals, assertMatch, assertRejects, assertStringIncludes, assertThrows } from "https://esm.sh/jsr/@std/assert@1";
+import * as colors from "https://esm.sh/jsr/@std/fmt@1/colors";
+import { Buffer } from "https://esm.sh/jsr/@std/io@0.221/buffer";
+import { readAll } from "https://esm.sh/jsr/@std/io@0.221/read-all";
+import { toWritableStream } from "https://esm.sh/jsr/@std/io@0.221/to-writable-stream";
+import * as path from "https://esm.sh/jsr/@std/path@1";
+import { readerFromStreamReader } from "https://esm.sh/jsr/@std/streams@0.221/reader-from-stream-reader";
+import { isNode } from "https://esm.sh/jsr/@david/which-runtime@0.2";
 import $, {
   build$,
   CommandBuilder,
@@ -2217,7 +2217,7 @@ Deno.test("nice error message when not awaiting a CommandBuilder", async () => {
   );
 });
 
-Deno.test("which uses same as $.which", async () => {
+Deno.test("https://esm.sh/jsr/@david/which@~0.4.1 uses same as $.which", async () => {
   {
     const whichFnOutput = await $.which("deno");
     const whichShellOutput = await $`which deno`.text();
@@ -2244,7 +2244,7 @@ Deno.test("which uses same as $.which", async () => {
       .noThrow()
       .stderr("piped")
       .stdout("piped");
-    assertEquals(whichShellOutput.stderr, "which: unsupported too many arguments\n");
+    assertEquals(whichShellOutput.stderr, "https://esm.sh/jsr/@david/which@~0.4.1: unsupported too many arguments\n");
     assertEquals(whichShellOutput.stdout, "");
     assertEquals(whichShellOutput.code, 2);
   }
@@ -2254,7 +2254,7 @@ Deno.test("which uses same as $.which", async () => {
       .noThrow()
       .stderr("piped")
       .stdout("piped");
-    assertEquals(whichShellOutput.stderr, "which: unsupported flag: -h\n");
+    assertEquals(whichShellOutput.stderr, "https://esm.sh/jsr/@david/which@~0.4.1: unsupported flag: -h\n");
     assertEquals(whichShellOutput.stdout, "");
     assertEquals(whichShellOutput.code, 2);
   }

@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "https://esm.sh/jsr/@std/assert@1";
 import { escapeArg } from "./command.ts";
 
 Deno.test("escapes arg", () => {
